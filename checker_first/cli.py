@@ -31,7 +31,9 @@ def api(port: int, bind: str):
             if self.path == "/contract":
                 return self._send(200, {"ck": cf.SCHEMA,
                     "rule": ["write_checker_before", "prove_reference_passes",
-                             "prove_baseline_fails", "lock_444", "ck_v3_only"]})
+                             "prove_baseline_fails", "lock_444", "ck_v3_only"],
+                    "verdicts": [cf.VERDICT_OK, cf.VERDICT_FIXTURE_INVALIDO,
+                                 cf.VERDICT_NAO_DISCRIMINA]})
             self._send(404, {"error": "not found"})
 
         def do_POST(self):
@@ -40,7 +42,10 @@ def api(port: int, bind: str):
             try:
                 n = int(self.headers.get("Content-Length", "0"))
                 d = json.loads(self.rfile.read(n) or b"{}")
-                r = cf.prove_two_ways(d["checker"], d["reference"], d["baseline"])
+                if d.get("mode") == "doctor":
+                    r = cf.doctor(d["checker"], d["reference"], d["baseline"]).to_dict()
+                else:
+                    r = cf.prove_two_ways(d["checker"], d["reference"], d["baseline"])
                 self._send(200, r)
             except Exception as e:
                 self._send(400, {"error": f"{type(e).__name__}: {e}"})
@@ -62,6 +67,9 @@ def main():
     q = sub.add_parser("verify", help="prova nos 2 sentidos")
     q.add_argument("--checker", required=True); q.add_argument("--reference", required=True)
     q.add_argument("--baseline", required=True)
+    q = sub.add_parser("doctor", help="diagnostica o instrumento e diz se a serie pode comecar")
+    q.add_argument("--checker", required=True); q.add_argument("--reference", required=True)
+    q.add_argument("--baseline", required=True)
     q = sub.add_parser("api", help="sobe API OpenAI-agnostica local")
     q.add_argument("--port", type=int, default=8790)
     q.add_argument("--bind", default="127.0.0.1")
@@ -72,10 +80,17 @@ def main():
         print_json(cf.run_checker(a.path, a.cwd).to_dict())
     elif a.cmd == "verify":
         print_json(cf.prove_two_ways(a.checker, a.reference, a.baseline))
+    elif a.cmd == "doctor":
+        rep = cf.doctor(a.checker, a.reference, a.baseline)
+        print_json(rep.to_dict())
+        # o codigo de saida diz se a serie pode comecar: 0 so quando o
+        # instrumento e' valido. Um script de serie que ignora isto volta a
+        # medir o instrumento em vez do modelo (o caso de 537 ciclos).
+        return 0 if rep.ok else 1
     elif a.cmd == "api":
         api(a.port, a.bind)
     else:
-        print("use: checker-first hash|run|verify|api")
+        print("use: checker-first hash|run|verify|doctor|api")
     return 0
 
 
