@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "checker-first"
+version = "0.1.0"
+description = "Checker escrito antes, travado e provado nos dois sentidos"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+
+[project.scripts]
+checker-first = "checker_first.cli:main"
+
+[tool.setuptools]
+packages = ["checker_first"]
